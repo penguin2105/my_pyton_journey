@@ -1,1 +1,5 @@
-
+def calculate_safari(hours,rate):
+  total=hours*rate
+  tax=total*0.13
+  return total-tax
+print("95000:",calculate_safari(120,350),"рубли")
