@@ -1,0 +1,4 @@
+discount = 15  
+price = 2000
+final_price = price * (1 - discount / 100)
+print("Цена со скидкой:", final_price)
