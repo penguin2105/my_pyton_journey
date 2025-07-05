@@ -1,0 +1,102 @@
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+
+# Токен вашего бота
+TOKEN = "7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY"
+
+# Функция для команды /start
+def start(update: Update, context: CallbackContext) -> None:
+    user = update.effective_user
+    update.message.reply_text(
+        f"Привет, {user.first_name}! Я Костя рванные колготки с кнопками.\n"
+        "Используй /help чтобы увидеть доступные команды."
+    )
+    show_main_keyboard(update, context)
+
+# Функция для команды /help
+def help_command(update: Update, context: CallbackContext) -> None:
+    help_text = """
+    Доступные команды:
+    /start - Начать работу с Костей
+    /help - Показать это помощь
+    /menu - Показать меню с Моими желаниями
+    /info - Информация о К.Ю
+    
+    Также вы можете использовать кнопки ниже!
+    """
+    update.message.reply_text(help_text)
+    help_text("Я К.ю люблю долбится в жопу")
+
+# Функция для команды /info
+def info(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(
+        "Это пример бота с кнопками и командами.\n"
+        "Используйте кнопки для взаимодействия."
+    )
+
+# Функция для показа главной клавиатуры
+def show_main_keyboard(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [KeyboardButton("Кнопка 1"), KeyboardButton("Кнопка 2")],
+        [KeyboardButton("Инлайн кнопки"), KeyboardButton("Помощь")],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+
+# Функция для обработки нажатий на кнопки
+def button_click(update: Update, context: CallbackContext) -> None:
+    text = update.message.text
+    if text == "Кнопка 1":
+        update.message.reply_text("Леша ты принял Электро спб!")
+    elif text == "Кнопка 2":
+        update.message.reply_text("Леша где провода!")
+    elif text == "Инлайн кнопки":
+        show_inline_keyboard(update, context)
+    elif text == "Помощь":
+        help_command(update, context)
+
+# Функция для показа инлайн клавиатуры
+def show_inline_keyboard(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("Опция 1", callback_data='option1')],
+        [InlineKeyboardButton("Опция 2", callback_data='option2')],
+        [InlineKeyboardButton("Закрыть", callback_data='close')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Выберите опцию:", reply_markup=reply_markup)
+
+# Функция для обработки инлайн кнопок
+def inline_button(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    query.answer()
+    
+    if query.data == 'option1':
+        query.edit_message_text(text="Где провода")
+    elif query.data == 'option2':
+        query.edit_message_text(text="Я на море жопу загораю")
+    elif query.data == 'close':
+        query.edit_message_text(text="Пошли отсюда")
+
+# Основная функция
+def main() -> None:
+    updater = Updater("7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY")
+    dispatcher = updater.dispatcher
+
+    # Обработчики команд
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("info", info))
+    dispatcher.add_handler(CommandHandler("menu", show_main_keyboard))
+
+    # Обработчики сообщений
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, button_click))
+    
+    # Обработчик инлайн кнопок
+    dispatcher.add_handler(CallbackQueryHandler(inline_button))
+
+    # Запуск бота
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
