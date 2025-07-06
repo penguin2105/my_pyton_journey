@@ -1,0 +1,137 @@
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+import random
+
+TOKEN = "7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY"
+
+def start(update: Update, context: CallbackContext) -> None:
+    user = update.effective_user
+    update.message.reply_text(
+        f"Привет, {user.first_name}! Я Костя рванные колготки с кнопками.\n"
+        "Используй /help чтобы увидеть доступные команды."
+    )
+    show_main_keyboard(update, context)
+
+def help_command(update: Update, context: CallbackContext) -> None:
+    help_text = """
+    Доступные команды:
+    /start - Начать работу с Костей
+    /help - Показать помощь
+    /menu - Показать меню
+    /info - Информация
+    /game - Играть в 'Угадай число' (1-100)
+    /stop - Сдаться и закончить игру
+    
+    Также вы можете использовать кнопки ниже!
+    """
+    update.message.reply_text(help_text)
+
+def info(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Я к.ю рвал твою жопу давай выбери пункты.\nНестесняйся я нефор.")
+
+def start_game(update: Update, context: CallbackContext) -> None:
+    secret_number = random.randint(1, 100)
+    context.user_data['game_active'] = True
+    context.user_data['secret_number'] = secret_number
+    context.user_data['attempts'] = 0
+    update.message.reply_text(
+        "🎮 Игра 'Угадай число'!\n"
+        "Ебаш число от 1 до 100. Попробуй угадать!\n"
+        "Чтобы сдаться, напиши /stop."
+    )
+
+def guess_number(update: Update, context: CallbackContext) -> None:
+    if not context.user_data.get('game_active'):
+        return
+        
+    try:
+        user_guess = int(update.message.text)
+        secret_number = context.user_data['secret_number']
+        context.user_data['attempts'] += 1
+
+        if user_guess < 1 or user_guess > 100:
+            update.message.reply_text("🚫 Провод должен быть от 1 до 100мм!")
+        elif user_guess < secret_number:
+            update.message.reply_text("⬆️ Нихуя не отгадал Сережа будет недоволен!")
+        elif user_guess > secret_number:
+            update.message.reply_text("⬇️ Нахуй столько мало!")
+        else:
+            attempts = context.user_data['attempts']
+            update.message.reply_text(f"🎉 Ебать ты молодец! Угадал за {attempts} попыток!")
+            context.user_data.clear()
+    except ValueError:
+        update.message.reply_text("🔢 Ебаш то мы с сережой обидемся от 1 до 100!")
+
+def stop_game(update: Update, context: CallbackContext) -> None:
+    if 'secret_number' in context.user_data:
+        secret_number = context.user_data['secret_number']
+        update.message.reply_text(
+            f"😥 Нихуя ты типо {secret_number}.\n"
+            "Если хочешь меня заебать ебаш /game."
+        )
+        context.user_data.clear()
+
+def show_main_keyboard(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [KeyboardButton("Кнопка 1"), KeyboardButton("Кнопка 2")],
+        [KeyboardButton("Инлайн кнопки"), KeyboardButton("Помощь")],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
+
+def button_click(update: Update, context: CallbackContext) -> None:
+    if context.user_data.get('game_active'):
+        return
+        
+    text = update.message.text
+    if text == "Кнопка 1":
+        update.message.reply_text("Леша ты принял Электро спб!")
+    elif text == "Кнопка 2":
+        update.message.reply_text("Леша где провода!")
+    elif text == "Инлайн кнопки":
+        show_inline_keyboard(update, context)
+    elif text == "Помощь":
+        help_command(update, context)
+
+def show_inline_keyboard(update: Update, context: CallbackContext) -> None:
+    keyboard = [
+        [InlineKeyboardButton("Опция 1", callback_data='option1')],
+        [InlineKeyboardButton("Опция 2", callback_data='option2')],
+        [InlineKeyboardButton("Закрыть", callback_data='close')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Выберите опцию:", reply_markup=reply_markup)
+
+def inline_button(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    query.answer()
+    
+    if query.data == 'option1':
+        query.edit_message_text(text="Где провода")
+    elif query.data == 'option2':
+        query.edit_message_text(text="Я на море жопу загораю для Вани")
+    elif query.data == 'close':
+        query.edit_message_text(text="Пошли отсюда")
+
+def main() -> None:
+    updater = Updater("7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY")
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("info", info))
+    dispatcher.add_handler(CommandHandler("menu", show_main_keyboard))
+    dispatcher.add_handler(CommandHandler("game", start_game))
+    dispatcher.add_handler(CommandHandler("stop", stop_game))
+
+    # Важно: сначала проверяем игру, потом кнопки
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, guess_number))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, button_click))
+    
+    dispatcher.add_handler(CallbackQueryHandler(inline_button))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
