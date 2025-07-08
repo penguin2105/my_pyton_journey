@@ -10,7 +10,9 @@ def start(update: Update, context: CallbackContext) -> None:
         f"Привет, {user.first_name}! Я Костя рванные колготки с кнопками.\n"
         "Используй /help чтобы увидеть доступные команды."
     )
-    show_main_keyboard(update, context)
+    show_main_keyboard("help_text")
+
+    
 
 def help_command(update: Update, context: CallbackContext) -> None:
     help_text = """
@@ -26,6 +28,8 @@ def help_command(update: Update, context: CallbackContext) -> None:
     """
     update.message.reply_text(help_text)
 
+
+        
 def info(update: Update, context: CallbackContext) -> None:
     update.message.reply_text("Я к.ю рвал твою жопу давай выбери пункты.\nНестесняйся я нефор.")
 
@@ -41,26 +45,26 @@ def start_game(update: Update, context: CallbackContext) -> None:
     )
 
 def guess_number(update: Update, context: CallbackContext) -> None:
-    if not context.user_data.get('game_active'):
-        return
-        
-    try:
-        user_guess = int(update.message.text)
-        secret_number = context.user_data['secret_number']
-        context.user_data['attempts'] += 1
+    if context.user_data.get('game_active'):
+        try:
+            user_guess = int(update.message.text)
+            secret_number = context.user_data['secret_number']
+            context.user_data['attempts'] += 1
 
-        if user_guess < 1 or user_guess > 100:
-            update.message.reply_text("🚫 Провод должен быть от 1 до 100мм!")
-        elif user_guess < secret_number:
-            update.message.reply_text("⬆️ Нихуя не отгадал Сережа будет недоволен!")
-        elif user_guess > secret_number:
-            update.message.reply_text("⬇️ Нахуй столько мало!")
-        else:
-            attempts = context.user_data['attempts']
-            update.message.reply_text(f"🎉 Ебать ты молодец! Угадал за {attempts} попыток!")
-            context.user_data.clear()
-    except ValueError:
-        update.message.reply_text("🔢 Ебаш то мы с сережой обидемся от 1 до 100!")
+            if user_guess < 1 or user_guess > 200:
+                update.message.reply_text("🚫 Провод должен быть от 1 до 200мм!")
+            elif user_guess < secret_number:
+                update.message.reply_text("⬆️ Нихуя не отгадал Сережа будет недоволен!")
+            elif user_guess > secret_number:
+                update.message.reply_text("⬇️ Нахуй столько мало!")
+            else:
+                attempts = context.user_data['attempts']
+                update.message.reply_text(f"🎉 Ебать ты молодец! Угадал за {attempts} попыток!")
+                context.user_data.clear()
+        except ValueError:
+            update.message.reply_text("🔢 Ебаш то мы с сережой обидемся от 1 до 200!")
+    else:
+        button_click(update, context)
 
 def stop_game(update: Update, context: CallbackContext) -> None:
     if 'secret_number' in context.user_data:
@@ -73,16 +77,13 @@ def stop_game(update: Update, context: CallbackContext) -> None:
 
 def show_main_keyboard(update: Update, context: CallbackContext) -> None:
     keyboard = [
-        [KeyboardButton("Кнопка 1"), KeyboardButton("Кнопка 2")],
-        [KeyboardButton("Инлайн кнопки"), KeyboardButton("Помощь")],
+        [KeyboardButton("Комната  1"), KeyboardButton("Комната 2")],
+        [KeyboardButton("Дополнительные функции"), KeyboardButton("Помощь")],
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
 
 def button_click(update: Update, context: CallbackContext) -> None:
-    if context.user_data.get('game_active'):
-        return
-        
     text = update.message.text
     if text == "Кнопка 1":
         update.message.reply_text("Леша ты принял Электро спб!")
@@ -124,10 +125,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("game", start_game))
     dispatcher.add_handler(CommandHandler("stop", stop_game))
 
-    # Важно: сначала проверяем игру, потом кнопки
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, guess_number))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, button_click))
-    
     dispatcher.add_handler(CallbackQueryHandler(inline_button))
 
     updater.start_polling()
