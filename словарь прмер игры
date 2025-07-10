@@ -1,0 +1,11 @@
+inventory={
+    "золото":100,
+    "меч":1,
+    "зелье":3,
+    "ключи": ["серебряный", "Ржавый"]
+    }
+print(" инвентарь:")
+for item , quantilty in inventory .items():
+    print(f"-{item}: {quantilty}")
+    inventory["золото"]+=50
+    print("n\ Нашли 50 золота !Теперь его:", inventory["золото"])
