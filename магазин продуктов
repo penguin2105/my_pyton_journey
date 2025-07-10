@@ -1,0 +1,12 @@
+products={
+    "молоко":80,
+    "хлеб":50,
+    "яица":120,
+    "сыр":200
+    }
+print("Товары дороже 70 рублей:")# вывод команды вывести все товар за н сумму
+for product, price in products.items():
+    if price > 70:
+        print(f"{product} {price}р")
+        total_cost = sum(products.values())# способ валиэс посчет всесь подсчет продуктов
+        print(f"Общая стоимость всех товаров: {total_cost}р")
