@@ -3,3 +3,17 @@ def calculate_safari(hours,rate):
   tax=total*0.13
   return total-tax
 print("95000:",calculate_safari(120,350),"рубли")
+
+
+
+фильмы
+films = [  фильма
+    {"title": "Дюна", "rating": 8.5, "sessions": [12, 15, 20]},  название и сеанс
+    {"title": "Остров фантазий", "rating": 7.1, "sessions": [10, 14, 19]},
+]
+
+print("Вечерние сеансы:")
+for movie in films:
+    evening_sessions = [str(s) for s in movie["sessions"] if s >= 18]  
+    if evening_sessions:  
+        print(f"{movie['title']}: {', '.join(evening_sessions)}")
