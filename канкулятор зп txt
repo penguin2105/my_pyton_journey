@@ -17,3 +17,23 @@ for movie in films:
     evening_sessions = [str(s) for s in movie["sessions"] if s >= 18]  
     if evening_sessions:  
         print(f"{movie['title']}: {', '.join(evening_sessions)}")
+ умный список
+    {"name": "молоко", "category": "молочное", "quantity": 2},
+    {"name": "яблоки", "category": "фрукты", "quantity": 5},
+    {"name": "хлеб", "category": "выпечка", "quantity": 1},
+    {"name": "яйца", "category": "молочное", "quantity": 10}
+]
+
+# Выводим список покупок по категориям
+print("Список покупок:")
+current_category = None
+
+for item in sorted(shopping_list, key=lambda x: x["category"]):
+    if item["category"] != current_category:
+        print(f"\n{item['category'].title()}:")
+        current_category = item["category"]
+    print(f"  - {item['name']} ({item['quantity']} шт.)")
+
+# Подсчёт общего количества
+total_quantity = sum(item["quantity"] for item in shopping_list)
+print(f"\nОбщее количество продуктов: {total_quantity} шт.")
