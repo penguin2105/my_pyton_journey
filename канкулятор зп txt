@@ -6,7 +6,10 @@ print("95000:",calculate_safari(120,350),"рубли")
 
 
 
-фильмы
+ФИЛЬМЫ
+
+
+
 films = [  фильма
     {"title": "Дюна", "rating": 8.5, "sessions": [12, 15, 20]},  название и сеанс
     {"title": "Остров фантазий", "rating": 7.1, "sessions": [10, 14, 19]},
@@ -37,3 +40,23 @@ for item in sorted(shopping_list, key=lambda x: x["category"]):
 # Подсчёт общего количества
 total_quantity = sum(item["quantity"] for item in shopping_list)
 print(f"\nОбщее количество продуктов: {total_quantity} шт.")
+
+
+
+
+
+
+
+
+МАГАЗИ
+
+items=["хлеб","молоко","яица"]
+prices=[35,95,65]
+print("в магазине")
+new_items=(input(" n\Введите новый товар:"))
+new_prices=(int(input("Введите цену товара:")))
+items.append(new_items)  
+prices.append(new_prices)
+print("n\ обновление список команд")
+for i in range(len(items)):
+     print(f"{i+1}.{items[i]}-{prices[i]}рубли!")
