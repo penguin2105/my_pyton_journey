@@ -36,3 +36,23 @@ for idx, product in enumerate(products):
 if len(products) >= 2:
     print(f"\nДополнительная скидка 10% за покупку {len(products)} товаров")
     print(f"Итоговая сумма: {total_cost:.2f} руб.")
+
+
+
+
+
+Cписок дел
+with open("tasks.txt", "w", encoding="utf-8") as file:
+    file.write("Купить молоко\n")
+    file.write("Позвонить маме\n")
+
+
+print("📝 Список дел:")
+with open("tasks.txt", "r", encoding="utf-8") as file:
+    for line in file:
+        print("- " + line.strip())  #
+
+new_task = input("\n+ Добавить задачу: ")
+with open("tasks.txt", "a", encoding="utf-8") as file:  
+    file.write(new_task + "\n")
+
