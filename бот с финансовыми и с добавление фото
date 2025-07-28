@@ -1,0 +1,203 @@
+import telebot
+import requests
+from bs4 import BeautifulSoup
+from telebot import types
+import time
+import threading
+import logging
+import os
+from datetime import datetime
+
+# Инициализация бота
+bot = telebot.TeleBot("7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY")  # Замените на реальный токен
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Папки для хранения данных
+PHOTOS_DIR = 'downloaded_photos'
+os.makedirs(PHOTOS_DIR, exist_ok=True)
+
+# Глобальная переменная для отслеживания активного потока
+active_thread = None
+
+def get_currency_rate(currency):
+    try:
+        url = "https://www.cbr.ru/currency_base/daily/"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        if currency == 'USD':
+            rate_text = soup.find('td', text='Доллар США').find_next_sibling('td').text
+            return float(rate_text.replace(',', '.'))
+        elif currency == 'EUR':
+            rate_text = soup.find('td', text='Евро').find_next_sibling('td').text
+            return float(rate_text.replace(',', '.'))
+        return None
+    except Exception as e:
+        logging.error(f"Ошибка при получении курса {currency}: {e}")
+        return None
+
+def check_rates_changes(chat_id):
+    global active_thread
+    while True:
+        try:
+            current_usd = get_currency_rate('USD')
+            current_eur = get_currency_rate('EUR')
+            
+            try:
+                if not os.path.exists('last_rates.txt'):
+                    with open('last_rates.txt', 'w') as f:
+                        if current_usd and current_eur:
+                            f.write(f"{current_usd},{current_eur}")
+                    continue
+                
+                with open('last_rates.txt', 'r+') as f:
+                    data = f.read().split(',')
+                    last_usd = float(data[0]) if data[0] else 0
+                    last_eur = float(data[1]) if len(data) > 1 and data[1] else 0
+                    
+                    messages = []
+                    if current_usd and current_usd != last_usd and last_usd != 0:
+                        messages.append(f"🔔 Изменился курс USD: {last_usd} → {current_usd} руб.")
+                    if current_eur and current_eur != last_eur and last_eur != 0:
+                        messages.append(f"🔔 Изменился курс EUR: {last_eur} → {current_eur} руб.")
+                    
+                    if messages:
+                        bot.send_message(chat_id, "\n".join(messages))
+                    
+                    if current_usd and current_eur:
+                        f.seek(0)
+                        f.write(f"{current_usd},{current_eur}")
+                        f.truncate()
+            
+            except Exception as e:
+                logging.error(f"Ошибка работы с файлом курсов: {e}")
+
+        except Exception as e:
+            logging.error(f"Ошибка в check_rates_changes: {e}")
+        
+        time.sleep(1800)  
+
+@bot.message_handler(content_types=['photo'])
+def handle_photos(message):
+    try:
+        photo_info = message.photo[-1]
+        file_id = photo_info.file_id
+        file_info = bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{bot.token}/{file_info.file_path}"
+        
+        download_path = os.path.join(PHOTOS_DIR, f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_id}.jpg")
+        
+        with open(download_path, 'wb') as new_file:
+            new_file.write(requests.get(file_url).content)
+        
+        bot.reply_to(message, "✅ Фото успешно сохранено!")
+        logging.info(f"Сохранено фото от {message.from_user.id}: {download_path}")
+        
+    except Exception as e:
+        error_msg = f"Ошибка при обработке фото: {str(e)}"
+        bot.reply_to(message, "⚠️ Не удалось обработать фото")
+        logging.error(error_msg)
+
+@bot.message_handler(content_types=['document'])
+def handle_documents(message):
+    if message.document.mime_type.startswith('image/'):
+        try:
+            file_info = bot.get_file(message.document.file_id)
+            file_url = f"https://api.telegram.org/file/bot{bot.token}/{file_info.file_path}"
+            
+            download_path = os.path.join(PHOTOS_DIR, f"doc_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{message.document.file_name}")
+            
+            with open(download_path, 'wb') as new_file:
+                new_file.write(requests.get(file_url).content)
+            
+            bot.reply_to(message, "✅ Фото (документ) успешно сохранено!")
+            logging.info(f"Сохранено фото-документ от {message.from_user.id}: {download_path}")
+        
+        except Exception as e:
+            error_msg = f"Ошибка при обработке фото-документа: {str(e)}"
+            bot.reply_to(message, "⚠️ Не удалось сохранить фото")
+            logging.error(error_msg)
+
+@bot.message_handler(commands=['start''help'])
+def send_welcome(message):
+    global active_thread
+  
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    btn_usd = types.KeyboardButton('USD')
+    btn_eur = types.KeyboardButton('EUR')
+    btn_all = types.KeyboardButton('Все курсы')
+    btn_subscribe = types.KeyboardButton('Подписаться на обновления')
+    btn_photo = types.KeyboardButton('Отправить фото')
+    markup.add(btn_usd, btn_eur, btn_all, btn_subscribe, btn_photo)
+    
+    text = "🏦 Привет! Я бот для отслеживания курсов валют ЦБ РФ и Сохраняю фото ."
+    if message.text == '/help':
+        text += "\n\nПомощь: для работы с курсами валют используйте кнопки меню"
+    
+    bot.send_message(message.chat.id, text, reply_markup=markup)
+    
+    if active_thread is None or not active_thread.is_alive():
+        active_thread = threading.Thread(
+            target=check_rates_changes,
+            args=(message.chat.id,),
+            daemon=True
+        )
+        active_thread.start()
+
+@bot.message_handler(commands=['sendphoto'])
+def request_photo(message):
+    bot.reply_to(message, "Пожалуйста, отправьте мне фото для сохранения")
+
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    if message.text == 'USD':
+        rate = get_currency_rate('USD')
+        if rate:
+            bot.send_message(message.chat.id, f"💵 Курс USD: {rate} руб.")
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить курс USD")
+    
+    elif message.text == 'EUR':
+        rate = get_currency_rate('EUR')
+        if rate:
+            bot.send_message(message.chat.id, f"💶 Курс EUR: {rate} руб.")
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить курс EUR")
+    
+    elif message.text == 'Все курсы':
+        usd = get_currency_rate('USD')
+        eur = get_currency_rate('EUR')
+        if usd and eur:
+            bot.send_message(
+                message.chat.id,
+                f"📊 Текущие курсы ЦБ РФ:\n\n"
+                f"💵 Доллар США: {usd} руб.\n"
+                f"💶 Евро: {eur} руб."
+            )
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить курсы валют")
+    
+    elif message.text == 'Подписаться на обновления':
+        bot.send_message(
+            message.chat.id,
+            "🔔 Вы подписаны на уведомления об изменениях курсов.\n"
+            "Я буду сообщать вам, когда курс изменится."
+        )
+    
+    elif message.text == 'Отправить фото':
+        request_photo(message)
+
+if __name__ == '__main__':
+    print("Бот запущен...")
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        logging.error(f"Ошибка в работе бота: {e}")
