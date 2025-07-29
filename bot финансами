@@ -39,6 +39,12 @@ def get_currency_rate(currency):
         elif currency == 'EUR':
             rate_text = soup.find('td', text='Евро').find_next_sibling('td').text
             return float(rate_text.replace(',', '.'))
+        elif currency == 'AED':
+            rate_text = soup.find('td', text='Дирхам ОАЭ').find_next_sibling('td').text
+            return float(rate_text.replace(',', '.'))
+        elif currency == 'THB':
+            rate_text = soup.find('td', text='Таиландский бат').find_next_sibling('td').text
+            return float(rate_text.replace(',', '.'))
         return None
     except Exception as e:
         logging.error(f"Ошибка при получении курса {currency}: {e}")
@@ -50,31 +56,39 @@ def check_rates_changes(chat_id):
         try:
             current_usd = get_currency_rate('USD')
             current_eur = get_currency_rate('EUR')
+            current_aed = get_currency_rate('AED')
+            current_thb = get_currency_rate('THB')
             
             try:
                 if not os.path.exists('last_rates.txt'):
                     with open('last_rates.txt', 'w') as f:
-                        if current_usd and current_eur:
-                            f.write(f"{current_usd},{current_eur}")
+                        if current_usd and current_eur and current_aed and current_thb:
+                            f.write(f"{current_usd},{current_eur},{current_aed},{current_thb}")
                     continue
                 
                 with open('last_rates.txt', 'r+') as f:
                     data = f.read().split(',')
                     last_usd = float(data[0]) if data[0] else 0
                     last_eur = float(data[1]) if len(data) > 1 and data[1] else 0
+                    last_aed = float(data[2]) if len(data) > 2 and data[2] else 0
+                    last_thb = float(data[3]) if len(data) > 3 and data[3] else 0
                     
                     messages = []
                     if current_usd and current_usd != last_usd and last_usd != 0:
                         messages.append(f"🔔 Изменился курс USD: {last_usd} → {current_usd} руб.")
                     if current_eur and current_eur != last_eur and last_eur != 0:
                         messages.append(f"🔔 Изменился курс EUR: {last_eur} → {current_eur} руб.")
+                    if current_aed and current_aed != last_aed and last_aed != 0:
+                        messages.append(f"🔔 Изменился курс AED: {last_aed} → {current_aed} руб.")
+                    if current_thb and current_thb != last_thb and last_thb != 0:
+                        messages.append(f"🔔 Изменился курс THB: {last_thb} → {current_thb} руб.")
                     
                     if messages:
                         bot.send_message(chat_id, "\n".join(messages))
                     
-                    if current_usd and current_eur:
+                    if current_usd and current_eur and current_aed and current_thb:
                         f.seek(0)
-                        f.write(f"{current_usd},{current_eur}")
+                        f.write(f"{current_usd},{current_eur},{current_aed},{current_thb}")
                         f.truncate()
             
             except Exception as e:
@@ -83,7 +97,7 @@ def check_rates_changes(chat_id):
         except Exception as e:
             logging.error(f"Ошибка в check_rates_changes: {e}")
         
-        time.sleep(1800)  
+        time.sleep(1800)  # Проверка каждые 30 минут
 
 @bot.message_handler(content_types=['photo'])
 def handle_photos(message):
@@ -133,14 +147,19 @@ def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn_usd = types.KeyboardButton('USD')
     btn_eur = types.KeyboardButton('EUR')
+    btn_aed = types.KeyboardButton('AED')
+    btn_thb = types.KeyboardButton('THB')
     btn_all = types.KeyboardButton('Все курсы')
     btn_subscribe = types.KeyboardButton('Подписаться на обновления')
     btn_photo = types.KeyboardButton('Отправить фото')
-    markup.add(btn_usd, btn_eur, btn_all, btn_subscribe, btn_photo)
+    markup.add(btn_usd, btn_eur, btn_aed, btn_thb, btn_all, btn_subscribe, btn_photo)
     
-    text = "🏦 Привет! Я бот для отслеживания курсов валют ЦБ РФ и Сохраняю фото ."
-  
-        
+    text = "🏦 Привет! Я бот для отслеживания курсов валют ЦБ РФ и сохранения фото.\n\n" \
+           "Доступные валюты:\n" \
+           "💵 USD - Доллар США\n" \
+           "💶 EUR - Евро\n" \
+           "🏜 AED - Дирхам ОАЭ\n" \
+           "🐘 THB - Тайский бат"
     
     bot.send_message(message.chat.id, text, reply_markup=markup)
     
@@ -172,18 +191,36 @@ def handle_message(message):
         else:
             bot.send_message(message.chat.id, "Не удалось получить курс EUR")
     
+    elif message.text == 'AED':
+        rate = get_currency_rate('AED')
+        if rate:
+            bot.send_message(message.chat.id, f"🏜 Курс AED (Дирхам ОАЭ): {rate} руб.")
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить курс AED")
+    
+    elif message.text == 'THB':
+        rate = get_currency_rate('THB')
+        if rate:
+            bot.send_message(message.chat.id, f"🐘 Курс THB (Тайский бат): {rate} руб.")
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить курс THB")
+    
     elif message.text == 'Все курсы':
         usd = get_currency_rate('USD')
         eur = get_currency_rate('EUR')
-        if usd and eur:
+        aed = get_currency_rate('AED')
+        thb = get_currency_rate('THB')
+        if usd and eur and aed and thb:
             bot.send_message(
                 message.chat.id,
                 f"📊 Текущие курсы ЦБ РФ:\n\n"
                 f"💵 Доллар США: {usd} руб.\n"
-                f"💶 Евро: {eur} руб."
+                f"💶 Евро: {eur} руб.\n"
+                f"🏜 Дирхам ОАЭ: {aed} руб.\n"
+                f"🐘 Тайский бат: {thb} руб."
             )
         else:
-            bot.send_message(message.chat.id, "Не удалось получить курсы валют")
+            bot.send_message(message.chat.id, "Не удалось получить все курсы валют")
     
     elif message.text == 'Подписаться на обновления':
         bot.send_message(
