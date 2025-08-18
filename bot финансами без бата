@@ -1,4 +1,5 @@
 import telebot
+import datetime
 import requests
 from bs4 import BeautifulSoup
 from telebot import types
@@ -7,6 +8,8 @@ import threading
 import logging
 import os
 from datetime import datetime
+import pytz
+
 
 # Инициализация бота
 bot = telebot.TeleBot("7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY")
@@ -48,6 +51,33 @@ CURRENCY_DATA = {
         'description': 'Валюта Объединенных Арабских Эмиратов',
         'flag': '🇦🇪',
         'cbr_name': 'Дирхам ОАЭ'
+    },
+    'THB': {
+        'name': 'Тайский бат',
+        'emoji': '฿',
+        'description': 'Валюта Таиланда',
+        'flag': '🇹🇭',
+        'cbr_name': 'Тайский бат'
+    },
+    'CNY': {
+        'name': 'Китайский юань',
+        'emoji': '¥',
+        'description': 'Валюта Китая',
+        'flag': '🇨🇳',
+        'cbr_name': 'Китайский юань'
+    },
+    'JPY': {
+        'name': 'Японская йена',
+        'emoji': '円',
+        'description': 'Валюта Японии',
+        'flag': '🇯🇵',
+        'cbr_name': 'Японская йена'
+    },
+    'KRW': {
+        'name': 'Южнокорейская Вона',
+        'emoji': '₩',
+        'flag': '🇰🇷',
+        'cbr_name': "Южнокорейская Вона"
     }
 }
 
@@ -57,25 +87,28 @@ def get_currency_rate(currency):
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        
+
         soup = BeautifulSoup(response.text, 'html.parser')
         table = soup.find('table', {'class': 'data'})
-        
+
         if not table:
             logger.error("Таблица с курсами валют не найдена")
             return None
-            
+
         for row in table.find_all('tr'):
             cols = row.find_all('td')
             if len(cols) >= 5:
                 code = cols[1].text.strip().split()[0]
                 if code == currency:
+                    nominal = float(cols[2].text.strip())
                     rate_text = cols[4].text.replace(',', '.')
-                    return float(rate_text)
-        
+                    direct_rate = float(rate_text) / nominal
+                    reverse_rate = 1 / direct_rate
+                    return direct_rate, reverse_rate
+
         logger.warning(f"Курс для {currency} не найден")
         return None
-        
+
     except Exception as e:
         logger.error(f"Ошибка при получении курса {currency}: {e}")
         return None
@@ -84,19 +117,30 @@ def check_rates_changes(chat_id):
     global active_thread, stop_thread
     while not stop_thread:
         try:
-            current_rates = {code: get_currency_rate(code) for code in CURRENCY_DATA}
-            
+            current_rates = {}
+            for code in CURRENCY_DATA:
+                rate = get_currency_rate(code)
+                if rate and len(rate) == 2:
+                    current_rates[code] = rate[0]  # Store only direct rate for comparison
+
             try:
                 if not os.path.exists('last_rates.txt'):
                     with open('last_rates.txt', 'w') as f:
-                        f.write(','.join(map(str, current_rates.values())))
+                        f.write(','.join(['0'] * len(CURRENCY_DATA)))
                     continue
-                
+
                 with open('last_rates.txt', 'r+') as f:
-                    last_rates = list(map(float, f.read().split(',')))
-                    if len(last_rates) != len(CURRENCY_DATA):
-                        last_rates = [0] * len(CURRENCY_DATA)
-                    
+                    content = f.read().strip()
+                    if not content:
+                        last_rates = [0.0] * len(CURRENCY_DATA)
+                    else:
+                        try:
+                            last_rates = list(map(float, content.split(',')))
+                            if len(last_rates) != len(CURRENCY_DATA):
+                                last_rates = [0.0] * len(CURRENCY_DATA)
+                        except ValueError:
+                            last_rates = [0.0] * len(CURRENCY_DATA)
+
                     messages = []
                     for i, (code, current) in enumerate(current_rates.items()):
                         last = last_rates[i]
@@ -104,49 +148,56 @@ def check_rates_changes(chat_id):
                             change = "↑" if current > last else "↓"
                             info = CURRENCY_DATA[code]
                             messages.append(
-                                f"{info['emoji']} {info['name']}: {last:.2f} → {current:.2f} руб. {change}"
+                                f"{info['emoji']} {info['name']}: {last:.4f} → {current:.4f} руб. {change}"
                             )
-                    
+
                     if messages:
                         bot.send_message(chat_id, "\n".join(messages))
-                    
+
                     f.seek(0)
                     f.write(','.join(map(str, current_rates.values())))
                     f.truncate()
-            
+
             except Exception as e:
                 logger.error(f"Ошибка работы с файлом курсов: {e}")
 
         except Exception as e:
             logger.error(f"Ошибка в check_rates_changes: {e}")
-        
-        time.sleep(1800)  # Проверка каждые 30 минут
+
+        time.sleep(1800)
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     global active_thread, stop_thread
-  
+
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     for code in CURRENCY_DATA:
         btn = types.KeyboardButton(f"{CURRENCY_DATA[code]['emoji']} {code}")
         markup.add(btn)
-    
+
     markup.add(
         types.KeyboardButton('📊 Все курсы'),
         types.KeyboardButton('🔔 Подписаться'),
         types.KeyboardButton('🔕 Отписаться'),
-        types.KeyboardButton('📷 Фото'),
         types.KeyboardButton('ℹ️ Помощь')
     )
-    
+
     welcome_text = (
-        "🏦 *Курсы валют ЦБ РФ*\n\n"
-        "Выберите валюту или действие:\n\n"
-        f"{' | '.join(f'{CURRENCY_DATA[code]['emoji']} {code}' for code in CURRENCY_DATA)}"
+        "🌟 *Добро пожаловать в Валютный Бот!* 🌟\n\n"
+        "Я помогу вам отслеживать актуальные курсы валют ЦБ РФ.\n\n"
+        "💱 *Доступные команды:*\n"
+        "• Нажмите на кнопку с валютой (например, 💵 USD) чтобы узнать текущий курс\n"
+        "• 📊 Все курсы - показать все доступные валюты\n"
+        "• 🔔 Подписаться - получать уведомления об изменениях курсов\n"
+        "• 🔕 Отписаться - отключить уведомления\n"
+        "• ℹ️ Помощь - справка по использованию бота\n\n"
+        "🔄 Курсы обновляются ежедневно с официального сайта ЦБ РФ\n"
+        "📅 Актуально на: " + datetime.now().strftime('%d.%m.%Y') + "\n\n"
+        "Выберите действие:"
     )
-    
+
     bot.send_message(message.chat.id, welcome_text, reply_markup=markup, parse_mode='Markdown')
-    
+
     stop_thread = False
     if active_thread is None or not active_thread.is_alive():
         active_thread = threading.Thread(
@@ -156,16 +207,27 @@ def send_welcome(message):
         )
         active_thread.start()
 
+@bot.message_handler(commands=['time'])
+def send_time(message):
+    try:
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        current_time = datetime.now(moscow_tz)
+        time_str = current_time.strftime("%H:%M:%S")
+        response = f"⏰ Текущее время в Москве: {time_str}"
+        bot.reply_to(message, response)
+    except Exception as e:
+        logger.error(f"Ошибка в функции send_time: {e}")
+        bot.reply_to(message, "Не удалось получить текущее время. Попробуйте позже.")
+
 @bot.message_handler(commands=['help'])
 def send_help(message):
     help_text = (
         "📚 *Справка по командам*\n\n"
         "*/start* - Главное меню\n"
         "*/help* - Эта справка\n"
-        "*/rates* - Все курсы валют\n\n"
         "💵 *Доступные валюты:*\n" +
         "\n".join(
-            f"{info['emoji']} {info['flag']} *{code}* - {info['name']}" 
+            f"{info['emoji']} {info['flag']} *{code}* - {info['name']}"
             for code, info in CURRENCY_DATA.items()
         ) +
         "\n\n📌 Просто нажмите на нужную кнопку в меню"
@@ -177,50 +239,68 @@ def handle_message(message):
     # Обработка запросов по валютам
     for code in CURRENCY_DATA:
         if code in message.text or CURRENCY_DATA[code]['emoji'] in message.text:
-            rate = get_currency_rate(code)
-            if rate:
+            rate_data = get_currency_rate(code)
+            if rate_data and len(rate_data) == 2:
+                direct_rate, reverse_rate = rate_data
                 info = CURRENCY_DATA[code]
                 response = (
                     f"{info['emoji']} {info['flag']} *{info['name']} ({code})*\n"
-                    f"📊 Курс ЦБ РФ: *{rate:.2f} руб.*\n"
+                    f"📊 Текущие курсы ЦБ РФ: *{direct_rate:.4f} руб.* за 1 {code}\n"
+                    f"🔁 Обратный курс: *{reverse_rate:.6f} {code}* за 1 рубль\n"
                     f"📅 Обновлено: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n"
-                    f"ℹ️ {info['description']}"
                 )
                 bot.send_message(message.chat.id, response, parse_mode='Markdown')
             else:
                 bot.send_message(message.chat.id, f"Не удалось получить курс {CURRENCY_DATA[code]['name']}")
             return
-    
+
     # Обработка других команд
-    if message.text == '📊 Все курсы' or message.text == 'Все курсы':
-        rates = {code: get_currency_rate(code) for code in CURRENCY_DATA}
+    if message.text in ('📊 Все курсы', 'Все курсы'):
+        rates = {}
+        failed = False
         
-        if all(rates.values()):
-            response = "📈 *Текущие курсы ЦБ РФ:*\n\n" + "\n".join(
-                f"{CURRENCY_DATA[code]['emoji']} {CURRENCY_DATA[code]['flag']} "
-                f"*{CURRENCY_DATA[code]['name']} ({code}):* {rate:.2f} руб."
-                for code, rate in rates.items()
+        for code in CURRENCY_DATA:
+            rate = get_currency_rate(code)
+            if not rate or len(rate) != 2:
+                failed = True
+                break
+            rates[code] = rate
+        
+        if not failed:
+            response_lines = []
+            for code, (direct, reverse) in rates.items():
+                currency_info = CURRENCY_DATA.get(code, {})
+                emoji = currency_info.get('emoji', '')
+                flag = currency_info.get('flag', '')
+                name = currency_info.get('name', code)
+                
+                response_lines.append(
+                    f"{emoji} {flag} *{name} ({code}):*\n"
+                    f"• {direct:.4f} руб. за 1 {code}\n"
+                    f"• {reverse:.6f} {code} за 1 рубль"
+                )
+            
+            response = (
+                "📈 *Текущие курсы ЦБ РФ:*\n\n" +
+                "\n\n".join(response_lines) +
+                f"\n\n🔄 Актуально на {datetime.now().strftime('%d.%m.%Y %H:%M')}"
             )
-            response += f"\n\n🔄 Актуально на {datetime.now().strftime('%d.%m.%Y %H:%M')}"
             bot.send_message(message.chat.id, response, parse_mode='Markdown')
         else:
-            bot.send_message(message.chat.id, "Не удалось получить все курсы валют")
-    
-    elif message.text == '🔔 Подписаться' or message.text == 'Подписаться':
+            bot.send_message(message.chat.id, "⚠️ Не удалось получить все курсы валют. Попробуйте позже.")
+
+    elif message.text in ('🔔 Подписаться', 'Подписаться'):
         global stop_thread
         stop_thread = False
         bot.send_message(message.chat.id, "🔔 Вы подписаны на уведомления об изменениях курсов")
-    
-    elif message.text == '🔕 Отписаться' or message.text == 'Отписаться':
+
+    elif message.text in ('🔕 Отписаться', 'Отписаться'):
         stop_thread = True
         bot.send_message(message.chat.id, "🔕 Уведомления отключены")
-    
-    elif message.text == '📷 Фото' or message.text == 'Фото':
-        bot.reply_to(message, "Отправьте мне фото для сохранения")
-    
-    elif message.text == 'ℹ️ Помощь' or message.text == 'Помощь':
+
+    elif message.text in ('ℹ️ Помощь', 'Помощь'):
         send_help(message)
-    
+
     else:
         bot.send_message(message.chat.id, "Не понимаю команду. Напишите /help для справки")
 
