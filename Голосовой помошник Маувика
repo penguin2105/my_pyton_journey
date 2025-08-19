@@ -1,3 +1,4 @@
+1-9 библиотеки
 import speech_recognition as sr
 import pyttsx3
 import datetime
@@ -9,16 +10,16 @@ import json
 
 class VoiceAssistant:
     def __init__(self):
-        # Инициализация рапознаватель голоса
+        # Инициализация рапознаватель голоса 12-16
         self.recongizer=sr.Recognizer()
         self.Microphone=sr.Microphone()
         self.engine = pyttsx3.init()
-        # распознаватель голоса
+        # распознаватель голоса18-20
         voise=self.engine.getProperty('voices')
         self.engine.setProperty('voices', [1].id)# 0 -гОЛОС МУЖЧИНЫ 1 ГОЛОС ДЕВУШКИ
         self.engine.setProperty('rate'150) # скорость голоса
-        self.name="Маувика"
-        
+        self.name="Маувика" имя голосового помошника
+        22-31 команды
         self.comands={
             "Привет я Маувика ":self.greet,
             "время": self.tell_time,
@@ -29,12 +30,13 @@ class VoiceAssistant:
             "расскажи шутку": self.tell_joke,
             "стоп": self.stop,
         }
+произношение 33-38
     def speak(self,text):
         """Произнеси текст"""
         print(f"Ассистент:{text}")
         self.engine.sey(text)
         self.engine.rubAndWait()
-
+распознание речи 40-43
     def listen(self):
         """Слушать и Распознавать речь"""
         with self.microphone as source:
