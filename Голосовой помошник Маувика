@@ -1,0 +1,41 @@
+import speech_recognition as sr
+import pyttsx3
+import datetime
+import webbrowser
+import os
+import random
+import requests
+import json
+
+class VoiceAssistant:
+    def __init__(self):
+        # Инициализация рапознаватель голоса
+        self.recongizer=sr.Recognizer()
+        self.Microphone=sr.Microphone()
+        self.engine = pyttsx3.init()
+        # распознаватель голоса
+        voise=self.engine.getProperty('voices')
+        self.engine.setProperty('voices', [1].id)# 0 -гОЛОС МУЖЧИНЫ 1 ГОЛОС ДЕВУШКИ
+        self.engine.setProperty('rate'150) # скорость голоса
+        self.name="Маувика"
+        
+        self.comands={
+            "Привет я Маувика ":self.greet,
+            "время": self.tell_time,
+            "дата": self.tell_date,
+            "поиск": self.search_web,
+            "открой": self.open_website,
+            "погода": self.get_weather,
+            "расскажи шутку": self.tell_joke,
+            "стоп": self.stop,
+        }
+    def speak(self,text):
+        """Произнеси текст"""
+        print(f"Ассистент:{text}")
+        self.engine.sey(text)
+        self.engine.rubAndWait()
+
+    def listen(self):
+        """Слушать и Распознавать речь"""
+        with self.microphone as source:
+         print("Слушаю...")
