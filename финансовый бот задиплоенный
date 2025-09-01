@@ -10,7 +10,7 @@ import pytz
 from datetime import datetime
 
 
-bot = telebot.TeleBot("7814951497:AAHM4Gg_PwhCjZQJ3aNltWjniCWfmCOJRPY")
+bot = telebot.TeleBot(токен бота")
 
 
 logging.basicConfig(
